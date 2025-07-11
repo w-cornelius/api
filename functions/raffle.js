@@ -7,9 +7,7 @@
  * @returns {string[]} An array of randomly selected items.
  */
 function getRandomElements(arr, num) {
-  // Create a copy of the array and shuffle it
   const shuffled = [...arr].sort(() => 0.5 - Math.random());
-  // Return the first `num` elements
   return shuffled.slice(0, num);
 }
 
@@ -39,41 +37,29 @@ export async function onRequest(context) {
   }
 
   try {
-    const twitchUrl = `https://tmi.twitch.tv/group/user/${channel.toLowerCase()}/chatters`;
-
-    // --- START OF MODIFIED CODE ---
-    // Make the fetch request with a User-Agent header. Some APIs block requests without one.
-    const response = await fetch(twitchUrl, {
-      headers: {
-        'User-Agent': 'Cloudflare-Worker-Raffle-Bot/1.0'
-      }
-    });
-    // --- END OF MODIFIED CODE ---
+    // --- NEW API ENDPOINT ---
+    // Fetch the list of chatters from the public StreamElements API.
+    const response = await fetch(`https://api.streamelements.com/kappa/v2/chatstats/${channel.toLowerCase()}/stats`);
     
     if (!response.ok) {
-        // If the response fails, try to get more error details from Twitch's response body
-        const errorBody = await response.text();
-        throw new Error(`Twitch API responded with status: ${response.status}. URL: ${twitchUrl}. Body: ${errorBody}`);
+      throw new Error(`StreamElements API responded with status: ${response.status}.`);
     }
 
     const data = await response.json();
-    const chatters = data.chatters;
-    const allChatters = [
-      ...chatters.vips, ...chatters.moderators, ...chatters.staff,
-      ...chatters.admins, ...chatters.global_mods, ...chatters.viewers,
-    ];
+    
+    // The StreamElements API returns a list of users in the 'chatters' property.
+    const allChatters = data.chatters || [];
 
     const eligibleChatters = allChatters.filter(user => !excludedUsers.has(user.toLowerCase()));
 
     if (eligibleChatters.length === 0) {
-        return new Response(JSON.stringify({ winners: [], chatter_count: 0 }), {
-            headers: { 'content-type': 'application/json;charset=UTF-8' },
-        });
+      return new Response(JSON.stringify({ winners: [], chatter_count: 0 }), {
+        headers: { 'content-type': 'application/json;charset=UTF-8' },
+      });
     }
 
     const winners = getRandomElements(eligibleChatters, 3);
 
-    // I've also added the chatter_count to the response for debugging
     return new Response(JSON.stringify({ winners, chatter_count: eligibleChatters.length }, null, 2), {
       headers: { 'content-type': 'application/json;charset=UTF-8' },
     });
