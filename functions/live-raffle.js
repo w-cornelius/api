@@ -1,4 +1,4 @@
-// functions/live-raffle.js
+// functions/twitch-raffle.js
 
 /**
  * Helper function to shuffle an array and pick a few items.
@@ -12,51 +12,70 @@ function getRandomElements(arr, num) {
 }
 
 /**
- * This is the main handler for the /live-raffle endpoint.
- * @param {object} context The context object from Cloudflare.
+ * Main handler for the /twitch-raffle endpoint.
+ * @param {object} context The context object from Cloudflare, containing environment variables.
  */
 export async function onRequest(context) {
-  // A set of usernames to exclude from the raffle.
-  const excludedUsers = new Set([
-    'botrixoficial', 'wizebot', 'streamelements', 'nightbot',
-    'dumiya_', 'djdubc_', 'dabackup_', 'housemusicislife_',
-    'dubbychat', 'dubbystestbot', 'blerp', 'ai_licia', 
-    'soundalerts', 'moobot', 'frostytoolsdotcom', 'fossabot', 
-    'streamlabs', 'botisimo', 'phantombot', 'lurxx',
-    'pokemoncommunitygame', 'sery_bot', 'kofistreambot', 'tangiabot',
-    'own3d', 'creatisbot', 'regressz'
-  ]);
+  // --- Credentials from Cloudflare Secrets ---
+  const broadcasterId = context.env.TWITCH_BROADCASTER_ID;
+  const moderatorId = context.env.TWITCH_BOT_ID;
+  const clientId = context.env.TWITCH_CLIENT_ID;
+  const accessToken = context.env.TWITCH_ACCESS_TOKEN;
 
-  const { searchParams } = new URL(context.request.url);
-  const channel = searchParams.get('channel');
-
-  if (!channel) {
-    const errorResponse = {
-      error: 'Please provide a channel name in the URL.',
-      example: 'https://your-site.pages.dev/live-raffle?channel=your_twitch_name'
-    };
-    return new Response(JSON.stringify(errorResponse, null, 2), {
-      status: 400,
+  // Check if the required secrets are set up.
+  if (!broadcasterId || !moderatorId || !clientId || !accessToken) {
+    return new Response(JSON.stringify({ error: "Server is not configured. Missing required environment variables." }), {
+      status: 500,
       headers: { 'content-type': 'application/json;charset=UTF-8' },
     });
   }
 
+  const excludedUsers = new Set([
+    'botrixoficial', 'wizebot', 'streamelements', 'nightbot', 'dumiya_', 'djdubc_',
+    'dabackup_', 'housemusicislife_', 'dubbychat', 'dubbystestbot', 'blerp',
+    'ai_licia', 'soundalerts', 'moobot', 'frostytoolsdotcom', 'fossabot',
+    'streamlabs', 'botisimo', 'phantombot', 'lurxx', 'pokemoncommunitygame',
+    'sery_bot', 'kofistreambot', 'tangiabot', 'own3d', 'creatisbot', 'regressz'
+  ]);
+
   try {
-    // Fetch the list of chatters from the public StreamElements API.
-    const response = await fetch(`https://api.streamelements.com/kappa/v2/chatstats/${channel.toLowerCase()}/stats`);
-    
-    if (!response.ok) {
-      throw new Error(`StreamElements API responded with status: ${response.status}.`);
+    let allChatters = [];
+    let cursor = null;
+    let hasMore = true;
+
+    // --- Loop to handle Twitch API pagination ---
+    while (hasMore) {
+      const url = new URL('https://api.twitch.tv/helix/chat/chatters');
+      url.searchParams.append('broadcaster_id', broadcasterId);
+      url.searchParams.append('moderator_id', moderatorId);
+      url.searchParams.append('first', '1000'); // Max allowed per page
+
+      if (cursor) {
+        url.searchParams.append('after', cursor);
+      }
+
+      const response = await fetch(url.toString(), {
+        headers: {
+          'Client-ID': clientId,
+          'Authorization': `Bearer ${accessToken}`,
+        },
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Twitch API responded with status: ${response.status}. Body: ${errorText}`);
+      }
+
+      const data = await response.json();
+      allChatters = allChatters.concat(data.data);
+      
+      cursor = data.pagination.cursor;
+      hasMore = !!cursor;
     }
 
-    const data = await response.json();
-    
-    // The StreamElements API returns a list of user objects in the 'chatters' property.
-    const allChatterObjects = data.chatters || [];
-
-    // Filter the list by checking the 'name' property of each user object.
-    const eligibleChatters = allChatterObjects.filter(user => 
-      user.name && !excludedUsers.has(user.name.toLowerCase())
+    // Filter out excluded bots and accounts
+    const eligibleChatters = allChatters.filter(user => 
+      user.user_login && !excludedUsers.has(user.user_login.toLowerCase())
     );
 
     if (eligibleChatters.length === 0) {
@@ -65,10 +84,10 @@ export async function onRequest(context) {
       });
     }
 
-    // Select 3 random winner *objects*.
+    // Select 3 random winner objects
     const winnerObjects = getRandomElements(eligibleChatters, 3);
-    // Extract just the name from each winner object to create a simple list.
-    const winners = winnerObjects.map(winner => winner.name);
+    // Extract just the display name from each winner object
+    const winners = winnerObjects.map(winner => winner.user_name);
 
     return new Response(JSON.stringify({ winners, chatter_count: eligibleChatters.length }, null, 2), {
       headers: { 'content-type': 'application/json;charset=UTF-8' },
