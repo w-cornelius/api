@@ -16,10 +16,17 @@ function getRandomElements(arr, num) {
  * @param {object} context The context object from Cloudflare.
  */
 export async function onRequest(context) {
+  // A set of usernames to exclude from the raffle.
   const excludedUsers = new Set([
+    // Original list
     'botrixoficial', 'wizebot', 'streamelements', 'nightbot',
     'dumiya_', 'djdubc_', 'dabackup_', 'housemusicislife_',
-    'dubbychat', 'dubbystestbot'
+    'dubbychat', 'dubbystestbot',
+    // --- New users added below ---
+    'blerp', 'ai_licia', 'soundalerts', 'moobot', 'frostytoolsdotcom',
+    'fossabot', 'streamlabs', 'botisimo', 'phantombot', 'lurxx',
+    'pokemoncommunitygame', 'sery_bot', 'kofistreambot', 'tangiabot',
+    'own3d', 'creatisbot', 'regressz'
   ]);
 
   const { searchParams } = new URL(context.request.url);
@@ -49,12 +56,10 @@ export async function onRequest(context) {
     // The StreamElements API returns a list of user objects in the 'chatters' property.
     const allChatterObjects = data.chatters || [];
 
-    // --- START OF MODIFIED CODE ---
     // Filter the list by checking the 'name' property of each user object.
     const eligibleChatters = allChatterObjects.filter(user => 
       user.name && !excludedUsers.has(user.name.toLowerCase())
     );
-    // --- END OF MODIFIED CODE ---
 
     if (eligibleChatters.length === 0) {
       return new Response(JSON.stringify({ winners: [], chatter_count: 0 }), {
@@ -62,12 +67,10 @@ export async function onRequest(context) {
       });
     }
 
-    // --- START OF MODIFIED CODE ---
     // Select 3 random winner *objects*.
     const winnerObjects = getRandomElements(eligibleChatters, 3);
     // Extract just the name from each winner object to create a simple list.
     const winners = winnerObjects.map(winner => winner.name);
-    // --- END OF MODIFIED CODE ---
 
     return new Response(JSON.stringify({ winners, chatter_count: eligibleChatters.length }, null, 2), {
       headers: { 'content-type': 'application/json;charset=UTF-8' },
