@@ -2,9 +2,9 @@
 
 /**
  * Helper function to shuffle an array and pick a few items.
- * @param {string[]} arr The array to shuffle.
+ * @param {object[]} arr The array of user objects to shuffle.
  * @param {number} num The number of items to select.
- * @returns {string[]} An array of randomly selected items.
+ * @returns {object[]} An array of randomly selected user objects.
  */
 function getRandomElements(arr, num) {
   const shuffled = [...arr].sort(() => 0.5 - Math.random());
@@ -37,7 +37,6 @@ export async function onRequest(context) {
   }
 
   try {
-    // --- NEW API ENDPOINT ---
     // Fetch the list of chatters from the public StreamElements API.
     const response = await fetch(`https://api.streamelements.com/kappa/v2/chatstats/${channel.toLowerCase()}/stats`);
     
@@ -47,10 +46,15 @@ export async function onRequest(context) {
 
     const data = await response.json();
     
-    // The StreamElements API returns a list of users in the 'chatters' property.
-    const allChatters = data.chatters || [];
+    // The StreamElements API returns a list of user objects in the 'chatters' property.
+    const allChatterObjects = data.chatters || [];
 
-    const eligibleChatters = allChatters.filter(user => !excludedUsers.has(user.toLowerCase()));
+    // --- START OF MODIFIED CODE ---
+    // Filter the list by checking the 'name' property of each user object.
+    const eligibleChatters = allChatterObjects.filter(user => 
+      user.name && !excludedUsers.has(user.name.toLowerCase())
+    );
+    // --- END OF MODIFIED CODE ---
 
     if (eligibleChatters.length === 0) {
       return new Response(JSON.stringify({ winners: [], chatter_count: 0 }), {
@@ -58,7 +62,12 @@ export async function onRequest(context) {
       });
     }
 
-    const winners = getRandomElements(eligibleChatters, 3);
+    // --- START OF MODIFIED CODE ---
+    // Select 3 random winner *objects*.
+    const winnerObjects = getRandomElements(eligibleChatters, 3);
+    // Extract just the name from each winner object to create a simple list.
+    const winners = winnerObjects.map(winner => winner.name);
+    // --- END OF MODIFIED CODE ---
 
     return new Response(JSON.stringify({ winners, chatter_count: eligibleChatters.length }, null, 2), {
       headers: { 'content-type': 'application/json;charset=UTF-8' },
