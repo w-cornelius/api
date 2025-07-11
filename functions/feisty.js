@@ -1,4 +1,4 @@
-// functions/api-dance.js
+// functions/feisty.js
 
 /**
  * This function is the handler for your API endpoint.
@@ -11,7 +11,7 @@ export async function onRequest(context) {
     random_integer: Math.floor(Math.random() * 100) + 1,
     random_float: Math.random() * 99.0 + 1.0,
     random_boolean: Math.random() < 0.5,
-    random_color: ['Red', 'Green', 'Blue', 'Yellow', 'Purple'][Math.floor(Math.random() * 5)],
+    random_feisty: ['feisty', 'slutty', 'freaky', 'horny', 'violently sexual', 'lucky', 'whorish', 'skanky', 'perverted', 'trampy', 'sleazy', 'depraved', 'lasivious', 'degenerate' ][Math.floor(Math.random() * 14)],
     unique_id: crypto.randomUUID(),
   };
 
