@@ -11,7 +11,7 @@ export async function onRequest(context) {
     random_integer: Math.floor(Math.random() * 100) + 1,
     random_float: Math.random() * 99.0 + 1.0,
     random_boolean: Math.random() < 0.5,
-    random_tindr: ['swipe right', 'swipe left' ][Math.floor(Math.random() * 2)],
+    random_tindr: ['swipe right (accept) dubbbcLOVE', 'swipe left (reject) dubbbcBurn', 'swipe right (accept) dubbbcStickDancee dubbbcDance2', 'swipe left (reject) dubbbcPika','swipe right (accept) dubbbcNut', 'swipe left (reject)  dubbbcMorpheusYell dubbbcDead'][Math.floor(Math.random() * 6)],
     random_feisty: ['feisty', 'slutty', 'freaky', 'horny', 'violently sexual', 'lucky', 'whorish', 'skanky', 'perverted', 'trampy', 'sleazy', 'depraved', 'lasivious', 'degenerate' ][Math.floor(Math.random() * 14)],
     unique_id: crypto.randomUUID(),
   };
