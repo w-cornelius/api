@@ -22,7 +22,6 @@ export async function onRequest(context) {
   const clientId = context.env.TWITCH_CLIENT_ID;
   const accessToken = context.env.TWITCH_ACCESS_TOKEN;
 
-  // Check if the required secrets are set up.
   if (!broadcasterId || !moderatorId || !clientId || !accessToken) {
     return new Response(JSON.stringify({ error: "Server is not configured. Missing required environment variables." }), {
       status: 500,
@@ -43,12 +42,11 @@ export async function onRequest(context) {
     let cursor = null;
     let hasMore = true;
 
-    // --- Loop to handle Twitch API pagination ---
     while (hasMore) {
       const url = new URL('https://api.twitch.tv/helix/chat/chatters');
       url.searchParams.append('broadcaster_id', broadcasterId);
       url.searchParams.append('moderator_id', moderatorId);
-      url.searchParams.append('first', '1000'); // Max allowed per page
+      url.searchParams.append('first', '1000');
 
       if (cursor) {
         url.searchParams.append('after', cursor);
@@ -73,23 +71,27 @@ export async function onRequest(context) {
       hasMore = !!cursor;
     }
 
-    // Filter out excluded bots and accounts
     const eligibleChatters = allChatters.filter(user => 
       user.user_login && !excludedUsers.has(user.user_login.toLowerCase())
     );
 
-    if (eligibleChatters.length === 0) {
-      return new Response(JSON.stringify({ winners: [], chatter_count: 0 }), {
-        headers: { 'content-type': 'application/json;charset=UTF-8' },
-      });
+    const responseObject = {
+        chatter_count: eligibleChatters.length
+    };
+
+    if (eligibleChatters.length > 0) {
+        const winnerObjects = getRandomElements(eligibleChatters, 3);
+        const winnerNames = winnerObjects.map(winner => winner.user_name);
+
+        // --- START OF MODIFIED CODE ---
+        // Add winners to the response object with keys like winner_1, winner_2, etc.
+        winnerNames.forEach((name, index) => {
+            responseObject[`winner_${index + 1}`] = name;
+        });
+        // --- END OF MODIFIED CODE ---
     }
 
-    // Select 3 random winner objects
-    const winnerObjects = getRandomElements(eligibleChatters, 3);
-    // Extract just the display name from each winner object
-    const winners = winnerObjects.map(winner => winner.user_name);
-
-    return new Response(JSON.stringify({ winners, chatter_count: eligibleChatters.length }, null, 2), {
+    return new Response(JSON.stringify(responseObject, null, 2), {
       headers: { 'content-type': 'application/json;charset=UTF-8' },
     });
 
